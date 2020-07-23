@@ -1,16 +1,19 @@
 ---
-title: <center> <h1>RNA-seq analysis, pre-processing the data</h1> </center>
+title: <center> <h1>Pre-processing the raw data</h1> </center>
 output: html_notebook
 ---
 
+\ 
+\ 
+\ 
 
 
 I downloaded the metadata of the experiment containing the SRR identifiers from the SRA Run Selector (<https://www.ncbi.nlm.nih.gov/Traces/study/?query_key=1&WebEnv=NCID_1_49133559_130.14.18.97_5555_1595467779_4208144827_0MetA0_S_HStore&o=acc_s%3Aa>)
 
+
 The following Bash script downloads the raw data using the SRR indentifiers from the Sra Run table.
 
-
-```{bash}
+```{bash, eval=FALSE}
 #!/bin/bash
 
 SRR_ID=$(tail -n +2 ~/project_virus_2020/project_virus_2020/SraRunTable.txt | cut -d ',' -f 1 | sort)
@@ -25,7 +28,9 @@ for i in ${SRR_ID}
 ```
 
 
-```{bash}
+After obtaining the sequencing data I ran FastQC and MultiQC to check the quality of the reads.
+
+```{bash, eval=FALSE}
 #!/bin/bash
 
 mkdir fastqc_output
@@ -36,13 +41,11 @@ multiqc fastqc_output/
 ```
 
 
-
-The multiQC report shows adaptor contamination which is removed by the following script using trimmomatic.
-
+The MultiQC report shows adaptor contamination which is removed by the following script using trimmomatic.
 
 
 
-```{bash}
+```{bash, eval=FALSE}
 #!/bin/bash
 
 # FastQC report shows presence of Illumina adaptors in all samples
@@ -72,7 +75,7 @@ for i in ${BASE_DIR}/*fastq.gz
 
 I performed quality control again using a modified script of the previous one to check whether the adaptors were removed from the reads.
 
-```{bash}
+```{bash, eval=FALSE}
 #!/bin/bash
 
 mkdir trimmed_fastqc_output
@@ -85,7 +88,7 @@ multiqc -o trimmed_multiqc_output trimmed_fastqc_output/
 
 I mapped the trimmed reads to the reference human genome using the following script.
 
-```{bash}
+```{bash,eval=FALSE}
 #!/bin/bash
 
 BASE_DIR=/home/anita/project_virus_2020
@@ -126,7 +129,7 @@ for i in ${FASTQ_FILES}/*.fastq.gz
 
 I created a map between the Ensembl transcript ID and Ensembl gene ID which is going to be used by the "tximport" package in R with the following script:
 
-```{bash}
+```{bash, eval=FALSE}
 #!/bin/bash
 
 zless gencode.v34.transcripts.fa.gz | grep -Po 'ENST\d{11}' > enst.txt
