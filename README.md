@@ -10,10 +10,10 @@ I describe my workflow in four separate Rmarkdown notebooks based on the followi
 
 The rendered html files can be viewed on the links below:
 
-* Bash scripts: [0_bash.html](http://htmlpreview.github.io/?https://github.com/aszabo08/rna-seq_analysis/blob/master/0_bash.html)
-* RNA-seq analysis of wild type TRIM28: [1_TRIM28_wt.html](http://htmlpreview.github.io/?https://github.com/aszabo08/rna-seq_analysis/blob/master/1_TRIM28_wt.html)
-* RNA-seq analysis of mutant TRIM28: [2_TRIM28_6KR.html](http://htmlpreview.github.io/?https://github.com/aszabo08/rna-seq_analysis/blob/master/2_TRIM28_6KR.html)
-* Comparison: [3_compare.html](http://htmlpreview.github.io/?https://github.com/aszabo08/rna-seq_analysis/blob/master/3_compare.html)
+* Bash scripts: [0_bash_scripts.html](http://htmlpreview.github.io/?https://github.com/aszabo08/rna-seq_analysis/blob/master/0_bash_scripts.html)
+* RNA-seq analysis of wild type TRIM28: [1_influenza_TRIM28_wt.html](http://htmlpreview.github.io/?https://github.com/aszabo08/rna-seq_analysis/blob/master/1_influenza_TRIM28_wt.html)
+* RNA-seq analysis of mutant TRIM28: [2_influenza_TRIM28_6KR.html](http://htmlpreview.github.io/?https://github.com/aszabo08/rna-seq_analysis/blob/master/2_influenza_TRIM28_6KR.html)
+* Comparison: [3_influenza_comparison.html](http://htmlpreview.github.io/?https://github.com/aszabo08/rna-seq_analysis/blob/master/3_influenza_comparison.html)
 
 
 
