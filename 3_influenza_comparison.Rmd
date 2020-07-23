@@ -1,6 +1,8 @@
 ---
-title:  <center> <h1>Comparison of samples expressing wild type and mutant TRIM28</h1> </center>
-output: html_notebook
+title: <center> <h1>Comparison of samples expressing wild type and mutant TRIM28</h1> </center>
+output:
+  html_document:
+    df_print: paged
 ---
 
 
@@ -14,9 +16,8 @@ library(tidyverse)
 
 
 
+
 ```{r com_test, include=FALSE}
-
-
 filter1_wt_ensg_id = dds_wt_filter1$ensg_id
 
 filter1_6KR_ensg_id = dds_6KR_filter1$ensg_id
@@ -38,12 +39,10 @@ colnames(filter1_shared_log2FC) = c("ensg_id", "log2FoldChange_wt", "log2FoldCha
 \ 
 
 
-The plot below compares the log2 fold changes in the two datasets considering the intersection of genes after the initial differential expression analysis. The points that represent the genes can be generally fitted to the f(x) = x line which indicates a correlation between the two datasets.
+The plot below compares the log2 fold changes in the two datasets considering the intersection of genes after the initial differential expression analysis. The black points that represent the genes can be generally fitted to the f(x) = x line which indicates a correlation between the two datasets.
 
 
-
-
-```{r comp_log2fc, echo=FALSE}
+```{r comp_log2fc, echo=FALSE, warning = FALSE}
 
 ggplot(filter1_shared_log2FC, aes(x = log2FoldChange_wt, y = log2FoldChange_6KR))+
       geom_point(alpha = 0.2) +
@@ -52,12 +51,13 @@ ggplot(filter1_shared_log2FC, aes(x = log2FoldChange_wt, y = log2FoldChange_6KR)
       ylim(-10, 10)
 ```
 
+\ 
 
-Spearman correlation was used to decipher the relationship between the two datasets.
+I used Spearman correlation to decipher the relationship between the two datasets.
 
 
 
-```{r comp_cor, echo=FALSE}
+```{r comp_cor, echo=FALSE,warning = FALSE, comment=""}
 
 cor.test(filter1_shared_log2FC$log2FoldChange_wt,
          filter1_shared_log2FC$log2FoldChange_6KR,
@@ -105,15 +105,16 @@ new_breaks = c(seq(min(all_diff_matrix), -0.01,  length.out = 50),
 \ 
 
 
-The heatmap below shows all the differentially expressed genes in both datasets, comparing their change of magnitude. Their response to the influenza A virus is highly similar, showing almost identical log2 fold changes in the genes.
+The heatmap below shows all the differentially expressed genes in both datasets, comparing their change of magnitude. The log2 fold changes due to the influenza A virus show similarity.
 
 ```{r comp_h_map, echo=FALSE}
 pheatmap(all_diff_matrix, breaks = new_breaks, cutree_cols = 2)
 ```
 
+\ 
 
 Based on the Venn-diagram below the number of genes that is differentially expressed in both datasets is 1379.
-The full list of these genes with annotation is available on here.
+
 
 
 ```{r com_plot_venn, echo=FALSE}
@@ -137,9 +138,12 @@ list_all_diff_annotated_genes = arrange(list_all_diff_annotated_genes, ensg_id)
 
 write_tsv(list_all_diff_annotated_genes, "influenza_diff_genes.txt")
 
-
 ```
 
+\ 
+The full list of these genes with annotation is available on [here](./influenza_diff_genes.txt)
+
+\ 
 
 
 

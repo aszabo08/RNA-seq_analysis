@@ -1,6 +1,8 @@
 ---
 title: <center> <h1>RNA-seq analysis of samples expressing mutant TRIM28 gene (TRIM28 6KR)</h1> </center>
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 
@@ -72,18 +74,16 @@ dist_6KR = as.matrix(dist(t(assay(vst_6KR))))
 \ 
 
 
-
-
-
-
-The following table shows the metadata of the experiment, including the samples that expresses mutant TRIM28 genes.
+The following table shows the metadata of the experiment, including the samples that express mutant TRIM28 genes.
 
 ```{r 6KR_meta, echo=FALSE}
 kable(sample_table_6KR) %>% kable_styling(bootstrap_options = c("bordered", "hover"), full_width = F, position = "left")
 ```
 
+\ 
 
-The heatmap below shows the distances across the samples, which is greatly similar to the first half of the dataset. The mock infected samples are similar to each other and significantly different from the influenza infected samples. The influenza infected samples with the mutant TRIM28 gene are more similar to each other than the samples expressing the wild type TRIM28.
+
+The heatmap below shows the distances across the samples, which is greatly similar to the first half of the dataset. The mock infected samples are similar to each other and significantly different from the influenza infected samples. The influenza infected samples with the mutant TRIM28 are more similar to each other than the samples expressing the wild type TRIM28.
 
 ```{r 6KR_sample_dist, echo=FALSE}
 
@@ -91,6 +91,7 @@ pheatmap(dist_6KR)
 
 ```
 
+\ 
 
 Similarly to the first analysis the presence of inluenza A is responsible for the great majority of the variance in the dataset, in this case 85% of the variance is explained by the first principal component.
 
@@ -106,14 +107,14 @@ result_dds_6KR = results(dds_6KR, contrast = c("treatment", "6KR_infected","6KR_
 
 ```
 
+\ 
 
-Result of DESeq on the samples 
+The initial result of the differential expression analysis is also highly similar to the first analysis. The number of genes with nonzero read count, low count and outliers are approximately the same resulting in about the same amount of differentially expressed genes based on the default treshold.
 
 ```{r 6KR_result_summary, echo=FALSE}
 summary(result_dds_6KR)
 ```
 
-The initial result of the differential expression analysis is also highly similar to the first analysis. The number of genes with nonzero read count, low count and outliers are approximately the same resulting in about the same amount of differentially expressed genes based on the default treshold.
 
 As in the first part of the dataset I introduced the same tresholds for the adjusted p-value and log2 fold change to further filter the initially obtained differentially expressed genes. (adjusted p-value <0.01 and |log2 fold change| > 2.)
 Based on this approach there are 2810 differentially expressed genes in this dataset.
@@ -177,6 +178,8 @@ volcano_plot_6KR = ggplot(annotated_dds_6KR_filter1, aes(x = log2FoldChange, y =
 
 ```
 
+\ 
+
 
 The interactive volcano plot below shows the same features as the volcano plot of the first part of the dataset. The majority of the differentially expressed genes are upregulated and the log2 fold change ranges from 2 to 10. 
 
@@ -219,8 +222,9 @@ rownames(top_25_vst_6KR) = names(genes_25_6KR)
 colors = colorRampPalette(brewer.pal(7, "Blues"))(100)
 ```
 
+\ 
 
-
+The heatmap below shows the top 25 differentially expressed genes across the 6 samples.
 
 ```{r 6KR_top_25_heatmap, echo=FALSE}
 
@@ -257,6 +261,7 @@ assay_5_6KR = column_to_rownames(assay_5_6KR,'external_gene_name' )
 assay_5_6KR$ensg_id = NULL
 ```
 
+\ 
 
 The tables below shows the difference between the original gene counts and the counts after the variance stabilizing transformation in the first five genes of the heatmap.
 
@@ -272,9 +277,6 @@ Transformed gene counts:
 ```{r table_assay, echo=FALSE}
 kable(assay_5_6KR) %>% kable_styling(bootstrap_options = c("bordered", "hover"), full_width = F, position = "left")
 ```
-
-
-
 
 
 
@@ -295,7 +297,10 @@ ego_6KR = enrichGO(gene = entrez_gene_6KR,
 
 ```
 
-The following plot shows the top biological processes that are enriched in the differentially expressed genes. Just like in the first half of the dataset the most enriched biological process is "leukocyte differentiation". Beside that only the "positive regulation of leukocyte migration" biological process is present in both datasets in the 10 most enriched gene sets, which indicates significantly different immune response in the two datasets.
+
+\ 
+
+The following plot shows the top biological processes that are enriched in the differentially expressed genes. Just like in the first half of the dataset the most enriched biological process is "leukocyte differentiation". Beside that only the "positive regulation of leukocyte migration" biological process is present in both datasets in the 10 most enriched gene sets, which indicates significantly different response in the two datasets.
 
 ```{r 6KR_dotplot_enrichment, echo=FALSE}
 dotplot(ego_6KR)
@@ -310,12 +315,20 @@ kegg_pathway_6KR = enrichKEGG(gene = entrez_gene_6KR,
 
 kegg_6KR_df = as.data.frame(kegg_pathway_6KR)
 
+kegg_6KR_main = kegg_6KR_df[ , c("Description", "GeneRatio", "p.adjust")]
+
+rownames(kegg_6KR_main) = NULL
+
+
 ```
 
-The following table shows the list of over-representated KEGG pathways in the differentially expressed genes which is identical with the over-represented pathways in the first dataset.
+\ 
+
+The following table shows the list of over-representated KEGG pathways in the differentially expressed genes.
+There are more than twice as many over-represented  pathways in this dataset than in the first one and all over-represented  pathways in the wild type TRIM28 samples are included in the mutant TRIM28 samples.
 
 ```{r kegg_table_6KR, echo=FALSE}
-kable(kegg_wt_main) %>% kable_styling(bootstrap_options = c("bordered", "hover"), full_width = F, position = "left")
+kable(kegg_6KR_main) %>% kable_styling(bootstrap_options = c("bordered", "hover"), full_width = F, position = "left")
 ```
 
 

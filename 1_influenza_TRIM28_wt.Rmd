@@ -1,6 +1,5 @@
 ---
-title: <center> <h1>RNA-seq analysis of samples expressing wild type TRIM28 gene</h1>
-  </center>
+title: <center> <h1>RNA-seq analysis of samples expressing wild type TRIM28</h1> </center>
 output:
   html_document:
     df_print: paged
@@ -72,13 +71,8 @@ dist_wt = as.matrix(dist(t(assay(vst_wt))))
 ```
 
 
-Background: the experiment that generated the raw sequencing data I am using in this RNA-seq experiment was conducted by University of Zurich.\
-I accessed this publicly available data on Sequence Read Archive (SRA), under the SRA identifier "SRP212102" ( <https://www.ncbi.nlm.nih.gov/sra?term=SRP212102> ).\
-\ 
 
-The following table shows the metadata of the experiment, including the samples that expresses wild type TRIM28 genes.\
-3 samples were mock infected and 3 samples were infected with **influenza A virus** at multiplicity of infection (MOI) of 10 Plaque forming units (PFU) per cell. RNA was extracted at 6 hours post infection.
-\ 
+The following table shows the metadata of the experiment, including the samples that express wild type TRIM28 genes.\
 
 
 ```{r wt_meta, echo=FALSE}
@@ -87,6 +81,7 @@ kable(sample_table_wt) %>% kable_styling(bootstrap_options = c("bordered", "hove
 
 ```
 
+\ 
 
 The heatmap below shows the distances across the samples, indicating significant difference between the groups of mock infected and influenza infected samples. While there is great similarity between the untreated, mock infected samples, the influenza infected samples are not only distant from the mock samples but also from each other.
 
@@ -96,6 +91,7 @@ pheatmap(dist_wt)
 
 ```
 
+\ 
 
 The principal component analysis of the samples supports the findings in the heatmap. The mock infected samples are similar to each other and significantly different from the influenza infected samples.
 The 72% of the variance of the dataset is explained by the first principal component, which is the presence of influenza A in the samples.
@@ -111,6 +107,7 @@ result_dds_wt = results(dds_wt, contrast = c("treatment", "wt_infected","wt_mock
 
 ```
 
+\ 
 
 The summary below shows how DESeq filtered out genes while performing differential gene expression analysis comparing the mock infected and influenza infected samples.
 
@@ -189,6 +186,7 @@ volcano_plot_wt = ggplot(annotated_dds_wt_filter1, aes(x = log2FoldChange, y = l
 
 ```
 
+\ 
 
 The interactive volcano plot below shows the magnitude of change in gene expression with its measure of significance. The red points are representing genes that are differentially expressed based on the tresholds described above.
 According to the plot the higher the log2 fold change the more significant the change is.
@@ -227,6 +225,7 @@ rownames(top_25_vst_wt) = names(genes_25_wt)
 
 ```
 
+\ 
 
 The heatmap below showsthe top 25 differentially expressed genes across the 6 samples. These genes are not expressed, or only with extremely low count in the mock infected samples while they are highly expressed in the influenza infected samples.
 
@@ -274,6 +273,7 @@ wt_assay_5 = column_to_rownames(wt_assay_5,'external_gene_name' )
 wt_assay_5$ensg_id = NULL
 ```
 
+\ 
 
 The gene counts were transformed by variance stabilizing transformation to obtain constant variance that is not dependent on the mean.
 The tables below shows the difference between the original and the transformed gene counts in the first five genes of the heatmap.
@@ -307,6 +307,8 @@ ego_wt = enrichGO(gene = entrez_gene_wt,
 
 ```
 
+\ 
+
 The following plot shows the top biological processes that are enriched in the differentially expressed genes.
 
 ```{r wt_dotplot_enrichment, echo=FALSE}
@@ -328,6 +330,7 @@ rownames(kegg_wt_main) = NULL
 
 ```
 
+\ 
 
 The following table shows the list of over-representated KEGG pathways in the differentially expressed genes.
 
