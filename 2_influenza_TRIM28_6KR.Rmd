@@ -181,10 +181,10 @@ volcano_plot_6KR = ggplot(annotated_dds_6KR_filter1, aes(x = log2FoldChange, y =
 \ 
 
 
-The interactive volcano plot below shows the same features as the volcano plot of the first part of the dataset. The majority of the differentially expressed genes are upregulated and the log2 fold change ranges from 2 to 10. 
+The volcano plot below shows the same features as the volcano plot of the first part of the dataset. The majority of the differentially expressed genes are upregulated and the log2 fold change ranges from 2 to 10. 
 
-```{r 6KR_volcano_plot, echo=FALSE}
-ggplotly(volcano_plot_6KR)
+```{r 6KR_volcano_plot, echo=FALSE, warning = FALSE}
+volcano_plot_6KR
 ```
 
 

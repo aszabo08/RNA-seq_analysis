@@ -188,12 +188,12 @@ volcano_plot_wt = ggplot(annotated_dds_wt_filter1, aes(x = log2FoldChange, y = l
 
 \ 
 
-The interactive volcano plot below shows the magnitude of change in gene expression with its measure of significance. The red points are representing genes that are differentially expressed based on the tresholds described above.
+The volcano plot below shows the magnitude of change in gene expression with its measure of significance. The red points are representing genes that are differentially expressed based on the tresholds described above.
 According to the plot the higher the log2 fold change the more significant the change is.
 While in the majority of the downregulated genes the absolute value of the log2 fold change is below 5, this value is 10 in the upregulated genes, showing significantly greater positive foldchanges after the influenza infection.
 
-```{r wt_volcano_plot, echo=FALSE}
-ggplotly(volcano_plot_wt)
+```{r wt_volcano_plot, echo=FALSE, warning = FALSE}
+volcano_plot_wt
 ```
 
 
