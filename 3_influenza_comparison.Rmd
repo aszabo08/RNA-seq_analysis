@@ -1,0 +1,145 @@
+---
+title:  <center> <h1>Comparison of samples expressing wild type and mutant TRIM28</h1> </center>
+output: html_notebook
+---
+
+
+```{r load_packages_comp, include=FALSE}
+library(BiocManager)
+library(gplots)
+library(pheatmap)
+library(gtools)
+library(tidyverse)
+```
+
+
+
+```{r com_test, include=FALSE}
+
+
+filter1_wt_ensg_id = dds_wt_filter1$ensg_id
+
+filter1_6KR_ensg_id = dds_6KR_filter1$ensg_id
+
+both_ensg_id = intersect(filter1_wt_ensg_id, filter1_6KR_ensg_id)
+
+filter1_wt_shared = dds_wt_filter1[dds_wt_filter1$ensg_id %in% both_ensg_id, c("ensg_id", "log2FoldChange") ]
+
+filter1_6KR_shared = dds_6KR_filter1[dds_6KR_filter1$ensg_id %in% both_ensg_id, c("ensg_id", "log2FoldChange") ]
+
+filter1_shared_log2FC = left_join(filter1_wt_shared, filter1_6KR_shared, by = c("ensg_id" = "ensg_id"))
+
+colnames(filter1_shared_log2FC) = c("ensg_id", "log2FoldChange_wt", "log2FoldChange_6KR")
+
+```
+
+\ 
+\ 
+\ 
+
+
+The plot below compares the log2 fold changes in the two datasets considering the intersection of genes after the initial differential expression analysis. The points that represent the genes can be generally fitted to the f(x) = x line which indicates a correlation between the two datasets.
+
+
+
+
+```{r comp_log2fc, echo=FALSE}
+
+ggplot(filter1_shared_log2FC, aes(x = log2FoldChange_wt, y = log2FoldChange_6KR))+
+      geom_point(alpha = 0.2) +
+      geom_abline(intercept = 0, slope = 1, colour = 'red', linetype = 2) +
+      xlim(-10, 10) +
+      ylim(-10, 10)
+```
+
+
+Spearman correlation was used to decipher the relationship between the two datasets.
+
+
+
+```{r comp_cor, echo=FALSE}
+
+cor.test(filter1_shared_log2FC$log2FoldChange_wt,
+         filter1_shared_log2FC$log2FoldChange_6KR,
+         method = "spearman")
+
+```
+
+The Spearman's correlation coefficient is close to 1 with a low p-value indicating significant positive correlation between the two datasets.
+
+
+```{r comp_venn, include=FALSE}
+
+
+diff_ensg_id_wt = dds_wt_filter3$ensg_id
+
+
+diff_ensg_id_6KR = dds_6KR_filter3$ensg_id
+
+venn_comparison = venn(list(TRIM28_wt_diff_exp_genes = diff_ensg_id_wt,
+                            TRIM28_6KR_diff_exp_genes = diff_ensg_id_6KR))
+```
+
+
+
+```{r comp_heat, include=FALSE}
+all_diff_ensg_id = union(diff_ensg_id_wt, diff_ensg_id_6KR)
+
+
+all_diff_matrix = filter1_shared_log2FC[filter1_shared_log2FC$ensg_id %in% all_diff_ensg_id, ]
+
+
+all_diff_matrix = as.matrix(all_diff_matrix[ , 2:3])
+
+rownames(all_diff_matrix ) = NULL
+
+# outliers skew the data
+
+new_breaks = c(seq(min(all_diff_matrix), -0.01,  length.out = 50),
+              0,
+              seq(0.01, max(all_diff_matrix), length.out = 50))
+
+
+```
+
+\ 
+
+
+The heatmap below shows all the differentially expressed genes in both datasets, comparing their change of magnitude. Their response to the influenza A virus is highly similar, showing almost identical log2 fold changes in the genes.
+
+```{r comp_h_map, echo=FALSE}
+pheatmap(all_diff_matrix, breaks = new_breaks, cutree_cols = 2)
+```
+
+
+Based on the Venn-diagram below the number of genes that is differentially expressed in both datasets is 1379.
+The full list of these genes with annotation is available on here.
+
+
+```{r com_plot_venn, echo=FALSE}
+
+plot(venn_comparison)
+
+```
+
+
+```{r comp_write, include=FALSE}
+
+all_diff_annotated_genes = attr(venn_comparison, "intersections")
+
+all_diff_annotated_genes = all_diff_annotated_genes$`TRIM28_wt_diff_exp_genes:TRIM28_6KR_diff_exp_genes`
+
+list_all_diff_annotated_genes = annotated_dds_wt_filter3[annotated_dds_wt_filter3$ensg_id %in% all_diff_annotated_genes, ]
+
+list_all_diff_annotated_genes = list_all_diff_annotated_genes[ , c("ensg_id", "external_gene_name", "chromosome_name", "description" )]
+
+list_all_diff_annotated_genes = arrange(list_all_diff_annotated_genes, ensg_id)
+
+write_tsv(list_all_diff_annotated_genes, "influenza_diff_genes.txt")
+
+
+```
+
+
+
+

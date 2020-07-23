@@ -1,0 +1,142 @@
+---
+title: <center> <h1>RNA-seq analysis, pre-processing the data</h1> </center>
+output: html_notebook
+---
+
+
+
+I downloaded the metadata of the experiment containing the SRR identifiers from the SRA Run Selector (<https://www.ncbi.nlm.nih.gov/Traces/study/?query_key=1&WebEnv=NCID_1_49133559_130.14.18.97_5555_1595467779_4208144827_0MetA0_S_HStore&o=acc_s%3Aa>)
+
+The following Bash script downloads the raw data using the SRR indentifiers from the Sra Run table.
+
+
+```{bash}
+#!/bin/bash
+
+SRR_ID=$(tail -n +2 ~/project_virus_2020/project_virus_2020/SraRunTable.txt | cut -d ',' -f 1 | sort)
+
+for i in ${SRR_ID}
+        do
+                echo 'Downloading the following SRA record:' ${i}
+                prefetch ${i}
+                fastq-dump --gzip --defline-qual '+' ${i}/${i}.sra
+                #rm the sra
+        done
+```
+
+
+```{bash}
+#!/bin/bash
+
+mkdir fastqc_output
+
+fastqc -o fastqc_output ../0_raw_data/*fastq.gz
+
+multiqc fastqc_output/
+```
+
+
+
+The multiQC report shows adaptor contamination which is removed by the following script using trimmomatic.
+
+
+
+
+```{bash}
+#!/bin/bash
+
+# FastQC report shows presence of Illumina adaptors in all samples
+
+BASE_DIR=/home/anita/project_virus_2020/0_raw_data
+TRIM_DIR=/home/anita/miniconda3/pkgs/trimmomatic-0.39-1/share/trimmomatic-0.39-1
+ADAPTERS=${TRIM_DIR}/adapters/TruSeq3-SE.fa
+
+mkdir trimmed_fastq
+
+for i in ${BASE_DIR}/*fastq.gz
+        do
+                SAMPLE=$(basename ${i} .fastq.gz)
+                echo 'Start of trimming ' ${SAMPLE}
+                java -jar ${TRIM_DIR}/trimmomatic.jar \
+                                                SE \
+                                                -phred33 \
+                                                -threads 6 \
+                                                ${i} \
+                                                trimmed_fastq/${SAMPLE}.trimmed.fastq.gz \
+                                                ILLUMINACLIP:${ADAPTERS}:2:30:10
+                echo 'End of trimming ' ${SAMPLE}
+
+        done
+```
+
+
+I performed quality control again using a modified script of the previous one to check whether the adaptors were removed from the reads.
+
+```{bash}
+#!/bin/bash
+
+mkdir trimmed_fastqc_output
+mkdir trimmed_multiqc_output
+
+fastqc -o trimmed_fastqc_output trimmed_fastq/*.fastq.gz
+multiqc -o trimmed_multiqc_output trimmed_fastqc_output/
+```
+
+
+I mapped the trimmed reads to the reference human genome using the following script.
+
+```{bash}
+#!/bin/bash
+
+BASE_DIR=/home/anita/project_virus_2020
+
+FASTQ_FILES=${BASE_DIR}/1_QC/1_trimmed_fastQC/trimmed_fastq
+
+mkdir salmon_output
+
+echo 'Downloading the human reference genome from GENCODE'
+
+wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_34/gencode.v34.transcripts.fa.gz
+
+echo 'Generating a Salmon index'
+
+salmon index -i human.v34.index -t gencode.v34.transcripts.fa.gz
+
+echo 'Start of RNA quantification with Salmon'
+
+for i in ${FASTQ_FILES}/*.fastq.gz
+        do
+                SAMPLE=$(basename ${i} .fastq.gz)
+                echo 'Start of RNA quantification of' ${SAMPLE}
+                salmon quant -i human.v34.index \
+                                -l A \
+                                -r ${i} \
+                                -o salmon_output/${SAMPLE} \
+                                -p 6 \
+                                --validateMappings \
+                                --gcBias \
+                                --seqBias
+                echo 'End of RNA quantification of ' ${SAMPLE}
+        done
+
+
+```
+
+
+
+I created a map between the Ensembl transcript ID and Ensembl gene ID which is going to be used by the "tximport" package in R with the following script:
+
+```{bash}
+#!/bin/bash
+
+zless gencode.v34.transcripts.fa.gz | grep -Po 'ENST\d{11}' > enst.txt
+
+zless gencode.v34.transcripts.fa.gz | grep -Po 'ENSG\d{11}' > ensg.txt
+
+paste -d ',' enst.txt ensg.txt > project_2020_gene_map.csv
+
+rm enst.txt ensg.txt
+```
+
+
+After running these scripts I obtained the necessary information to start the analysis in R.

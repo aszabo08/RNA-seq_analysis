@@ -1,0 +1,342 @@
+---
+title: <center> <h1>RNA-seq analysis of samples expressing wild type TRIM28 gene</h1>
+  </center>
+output:
+  html_document:
+    df_print: paged
+---
+
+\ 
+\ 
+
+
+```{r load_packages, include=FALSE}
+library(BiocManager)
+library(knitr)
+library(tximport)
+library(DESeq2)
+library(pheatmap)
+library(ggplot2)
+library(biomaRt)
+library(plotly)
+library(RColorBrewer)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(pathview)
+library(knitr)
+library(kableExtra)
+library(tidyverse)
+```
+
+
+```{r load_data, include=FALSE}
+sample_table <- as.data.frame(read_csv("../SraRunTable.txt"))
+
+sample_table <- select(sample_table, Run, 'Sample Name', 'genotype/variation',  infection, source_name)
+
+sample_table <- rename(sample_table, run_name=Run, sample_name='Sample Name')
+
+sample_table$treatment <- factor(rep(c("wt_mock", "wt_infected", "6KR_mock", "6KR_infected"), each = 3), levels= c("wt_mock", "wt_infected", "6KR_mock", "6KR_infected"))
+
+sample_files=list.files("C:/Ancsi/Bioinformatics Support Unit/project_virus_2020/salmon_output", full.names = TRUE, recursive = TRUE, pattern = "quant.sf")
+
+names(sample_files) = pull(sample_table, sample_name)
+
+gene_map <- read_csv("../project_2020_gene_map.csv", col_names = c("enst_id", "ensg_id"))
+
+```
+
+
+
+```{r wt_data_analysis, include=FALSE}
+
+sample_table_wt = sample_table[1:6, ]
+
+sample_files_wt = sample_files[1:6]
+
+txi_wt = tximport(files = sample_files_wt,
+                  type = "salmon",
+                  tx2gene = gene_map,
+                  ignoreTxVersion = TRUE)
+
+dds_wt = DESeqDataSetFromTximport(txi = txi_wt,
+                                  colData = sample_table_wt,
+                                  design = ~ treatment)
+
+dds_wt = DESeq(dds_wt)
+
+vst_wt = varianceStabilizingTransformation(dds_wt)
+
+dist_wt = as.matrix(dist(t(assay(vst_wt))))
+
+```
+
+
+Background: the experiment that generated the raw sequencing data I am using in this RNA-seq experiment was conducted by University of Zurich.\
+I accessed this publicly available data on Sequence Read Archive (SRA), under the SRA identifier "SRP212102" ( <https://www.ncbi.nlm.nih.gov/sra?term=SRP212102> ).\
+\ 
+
+The following table shows the metadata of the experiment, including the samples that expresses wild type TRIM28 genes.\
+3 samples were mock infected and 3 samples were infected with **influenza A virus** at multiplicity of infection (MOI) of 10 Plaque forming units (PFU) per cell. RNA was extracted at 6 hours post infection.
+\ 
+
+
+```{r wt_meta, echo=FALSE}
+
+kable(sample_table_wt) %>% kable_styling(bootstrap_options = c("bordered", "hover"), full_width = F, position = "left")
+
+```
+
+
+The heatmap below shows the distances across the samples, indicating significant difference between the groups of mock infected and influenza infected samples. While there is great similarity between the untreated, mock infected samples, the influenza infected samples are not only distant from the mock samples but also from each other.
+
+```{r wt_sample_dist, echo=FALSE}
+
+pheatmap(dist_wt)
+
+```
+
+
+The principal component analysis of the samples supports the findings in the heatmap. The mock infected samples are similar to each other and significantly different from the influenza infected samples.
+The 72% of the variance of the dataset is explained by the first principal component, which is the presence of influenza A in the samples.
+
+```{r wt_plotpca, echo=FALSE}
+plotPCA(vst_wt, intgroup = "treatment")
+```
+
+
+```{r wt_result, include=FALSE}
+
+result_dds_wt = results(dds_wt, contrast = c("treatment", "wt_infected","wt_mock"))
+
+```
+
+
+The summary below shows how DESeq filtered out genes while performing differential gene expression analysis comparing the mock infected and influenza infected samples.
+
+```{r wt_result_summary, echo=FALSE}
+summary(result_dds_wt)
+```
+
+28469 genes were considered for differential expression as the rest of the genes have not been expressed.
+Outliers and genes with low counts (in this case mean count < 2) were filtered out.
+By default in this analysis a gene is considered to be differentially expressed if the adjusted p-value (for multiple testing correction) is less than 0.1.
+Based on that criteria there are 5219 upregulated and 4185 downregulated genes.
+
+I further filtered this dataset by setting the treshold for adjusted p-value less than 0.01 and for the absolute value of log2 fold change greater than 2.
+Based on this approach there are 2194 differentially expressed genes in this dataset.
+
+
+
+
+
+```{r wt_annotation, include=FALSE}
+result_dds_wt_df = as.data.frame(result_dds_wt)
+
+dds_wt_filter1 = result_dds_wt_df[ complete.cases(result_dds_wt_df), ]
+
+
+dds_wt_filter1 = rownames_to_column(dds_wt_filter1, var = 'ensg_id')
+
+
+ensembl100 = useEnsembl(biomart = 'ensembl', dataset = 'hsapiens_gene_ensembl')
+
+annotation_wt = getBM(attributes = c('ensembl_gene_id',
+                                  'entrezgene_id',
+                                  'external_gene_name',
+                                  'chromosome_name',
+                                  'description'),
+                  filters = 'ensembl_gene_id',
+                  values = dds_wt_filter1$ensg_id,
+                  mart = ensembl100)
+
+annotated_dds_wt_filter1 = left_join(dds_wt_filter1, annotation_wt, by = c('ensg_id' = 'ensembl_gene_id') )
+```
+
+
+
+
+
+
+```{r wt_volcano_script, include= FALSE}
+
+# adding a new column with logical values deciding whether a gene is differentially expressed or not
+annotated_dds_wt_filter1$diff_genes = annotated_dds_wt_filter1$padj < 0.01 & abs(annotated_dds_wt_filter1$log2FoldChange) > 2
+
+annotated_dds_wt_filter1$shape = ifelse((-log10(annotated_dds_wt_filter1$padj)>50), "triangle", "circle")
+annotated_dds_wt_filter1$limited_padj = -log10(annotated_dds_wt_filter1$padj)
+annotated_dds_wt_filter1$limited_padj[annotated_dds_wt_filter1$limited_padj>50] = 50
+
+# there are 17 genes with -log10 padj 50 or above 50
+
+
+volcano_plot_wt = ggplot(annotated_dds_wt_filter1, aes(x = log2FoldChange, y = limited_padj, colour = diff_genes, shape = shape, name = external_gene_name)) +
+  scale_color_manual(values = c("black", "red")) +
+  geom_point(size = 1.5, alpha = 0.2) +
+  geom_vline(xintercept = 2, colour = 'grey', linetype = 2) +
+  geom_vline(xintercept = -2, colour = 'grey', linetype = 2) +
+  geom_hline(yintercept = -log10(0.01), colour = 'grey', linetype = 2) +
+  xlim(-10, 10) +
+  ylim(0, 50) +
+  theme_bw() +
+  labs(title = "Volcano plot of wild type TRIM28 samples",
+       x = "Log2FoldChange of gene expression",
+       y = "-log10 of the adjusted p-value") +
+  theme(legend.position = 'none',
+        axis.title = element_text(face="bold", size=12),
+        plot.title = element_text(hjust = 0.5 ,face="bold", size=14), 
+        plot.subtitle = element_text(hjust = 0.5, size=12))
+
+```
+
+
+The interactive volcano plot below shows the magnitude of change in gene expression with its measure of significance. The red points are representing genes that are differentially expressed based on the tresholds described above.
+According to the plot the higher the log2 fold change the more significant the change is.
+While in the majority of the downregulated genes the absolute value of the log2 fold change is below 5, this value is 10 in the upregulated genes, showing significantly greater positive foldchanges after the influenza infection.
+
+```{r wt_volcano_plot, echo=FALSE}
+ggplotly(volcano_plot_wt)
+```
+
+
+```{r wt_filtering, include=FALSE}
+dds_wt_filter2 = dds_wt_filter1[dds_wt_filter1$padj < 0.01, ]
+
+dds_wt_filter3 = dds_wt_filter2[ abs(dds_wt_filter2$log2FoldChange) > 2, ]
+
+#dds_wt_filter3 = rownames_to_column(dds_wt_filter3, var = "ensg_id")
+
+annotated_dds_wt_filter3 = left_join(dds_wt_filter3, annotation_wt, by = c("ensg_id" = "ensembl_gene_id"))
+```
+
+
+
+
+```{r wt_top_25_genes, include=FALSE}
+top_25_wt = arrange(annotated_dds_wt_filter3, desc(abs(log2FoldChange)))[1:25, ]
+
+genes_25_wt = top_25_wt$ensg_id
+
+names(genes_25_wt) = top_25_wt$external_gene_name
+
+
+top_25_vst_wt = assay(vst_wt)[genes_25_wt, ]
+
+rownames(top_25_vst_wt) = names(genes_25_wt)
+
+
+```
+
+
+The heatmap below showsthe top 25 differentially expressed genes across the 6 samples. These genes are not expressed, or only with extremely low count in the mock infected samples while they are highly expressed in the influenza infected samples.
+
+
+
+```{r wt_colours, include=FALSE}
+colors = colorRampPalette(brewer.pal(7, "Blues"))(100)
+```
+
+
+
+
+```{r wt_top_25_heatmap, echo=FALSE}
+
+pheatmap(top_25_vst_wt, fontsize = 7, color = colors, cutree_cols  = 2)
+
+```
+
+
+
+```{r wt_5, include=FALSE}
+wt_count_5 = as.data.frame(counts(dds_wt))
+
+wt_count_5 = rownames_to_column(wt_count_5, var = "ensg_id")
+
+wt_count_5 =  wt_count_5[wt_count_5$ensg_id  %in% genes_25_wt, ][1:5, ]
+
+wt_count_5 = left_join(wt_count_5, annotation_wt[ , c('ensembl_gene_id','external_gene_name')], by = c("ensg_id" = "ensembl_gene_id"))
+
+wt_count_5 = column_to_rownames(wt_count_5,'external_gene_name' )
+
+wt_count_5$ensg_id = NULL
+
+
+wt_assay_5 = as.data.frame(assay(vst_wt))
+
+wt_assay_5 = rownames_to_column(wt_assay_5, var = "ensg_id")
+
+wt_assay_5 =  wt_assay_5[wt_assay_5$ensg_id  %in% genes_25_wt, ][1:5, ]
+
+wt_assay_5 = left_join(wt_assay_5, annotation_wt[ , c('ensembl_gene_id','external_gene_name')], by = c("ensg_id" = "ensembl_gene_id"))
+
+wt_assay_5 = column_to_rownames(wt_assay_5,'external_gene_name' )
+
+wt_assay_5$ensg_id = NULL
+```
+
+
+The gene counts were transformed by variance stabilizing transformation to obtain constant variance that is not dependent on the mean.
+The tables below shows the difference between the original and the transformed gene counts in the first five genes of the heatmap.
+
+Original gene counts:
+
+```{r table_count, echo=FALSE}
+kable(wt_count_5) %>% kable_styling(bootstrap_options = c("bordered", "hover"), full_width = F, position = "left")
+```
+
+Transformed gene counts:
+
+```{r table_assay, echo=FALSE}
+kable(wt_assay_5) %>% kable_styling(bootstrap_options = c("bordered", "hover"), full_width = F, position = "left")
+```
+
+
+```{r wt_gene_set_enrichment, include=FALSE}
+
+entrez_gene_wt = as.character(annotated_dds_wt_filter3$entrezgene_id)
+
+entrez_uni_wt = as.character(annotated_dds_wt_filter1$entrezgene_id)
+
+
+ego_wt = enrichGO(gene = entrez_gene_wt,
+                  OrgDb = org.Hs.eg.db,
+                  ont = "BP",
+                  universe = entrez_uni_wt,
+                  readable = TRUE)
+
+
+```
+
+The following plot shows the top biological processes that are enriched in the differentially expressed genes.
+
+```{r wt_dotplot_enrichment, echo=FALSE}
+dotplot(ego_wt)
+
+```
+
+
+
+```{r wt_kegg, include=FALSE}
+kegg_pathway_wt = enrichKEGG(gene = entrez_gene_wt,
+                             universe = entrez_uni_wt)
+
+kegg_wt_df = as.data.frame(kegg_pathway_wt)
+
+kegg_wt_main = kegg_wt_df[ , c("Description", "GeneRatio", "p.adjust")]
+
+rownames(kegg_wt_main) = NULL
+
+```
+
+
+The following table shows the list of over-representated KEGG pathways in the differentially expressed genes.
+
+```{r kegg_table, echo=FALSE}
+kable(kegg_wt_main) %>% kable_styling(bootstrap_options = c("bordered", "hover"), full_width = F, position = "left")
+```
+
+
+
+
+
+
