@@ -1,6 +1,6 @@
 This is a personal project in bioinformatics performing an RNA-seq analysis using Salmon for mapping the reads to the reference genome and DESeq2 for differential expression analysis.
 
-Background: the experiment that generated the raw sequencing data I am using was conducted by Schmidt N, Domingues P, Golebiowski F, Patzina C et al. from University of Zurich [[1]](#1)
+**Background**: the experiment that generated the raw sequencing data I am using was conducted by Schmidt N, Domingues P, Golebiowski F, Patzina C et al. from University of Zurich [[1]](#1)
 I accessed this publicly available data on Sequence Read Archive (SRA), under the SRA identifier "SRP212102" (<https://www.ncbi.nlm.nih.gov/sra?term=SRP212102>)
 The aim of the experiment was to compare the differentially expressed genes in human lung epithelial cells expressing wild type TRIM28 or SUMOylation-deficient mutant TRIM28 (TRIM28 6KR) after influenza A infection.
 
@@ -8,9 +8,11 @@ Small Ubiquitin-like Modifier (SUMO) proteins participate in SUMOylation which i
 IRF7 regulates the transcription of interferons, which are signalling proteins that result in virus induced defensive response from the immune system.
 Tripartite motif–containing protein 28 (TRIM28) is a SUMO E3 ligase which is specific for IRF7 SUMOylation, resulting in repressed anti-viral response. [[2]](#2)
 
-Out of the total 12 samples 6 expressed the wild type gene and 6 expressed the mutant gene. In both groups 3-3 samples were mock infected and infected with influenza A virus at MOI=10 PFU/cell. RNA was extracted at 6 hours post infection.
+**Expectation**: by using wild type TRIM28 and SUMOylation-deficient TRIM28 6KR the difference after influenza infection can be compared. Cells with the former gene expected to have lower anti-viral response due to the impact of SUMOylation, while cells with the latter gene are predicted to have greater defensive response as their interferon transcription is not regulated negatively by IRF7.
 
-I describe my workflow in four separate Rmarkdown notebooks based on the following areas: pre-processing of the raw data, RNA-seq analysis of the samples expressing wild type TRIM28, RNA-seq analysis of the samples expressing mutant TRIM28 and the comparison of these two datasets.
+**Experiment**: the experiment involved twelve samples out of which six contained cells expressing the wild type TRIM28 and six expressing TRIM28 6KR. In both groups three-three samples were mock infected and infected with influenza A virus at MOI=10 PFU/cell. RNA was extracted at 6 hours post infection.
+
+**Analysis**: I describe my workflow in four separate Rmarkdown notebooks based on the following areas: pre-processing of the raw data, RNA-seq analysis of the samples expressing wild type TRIM28, RNA-seq analysis of the samples expressing TRIM28 6KR and the comparison of the last two results.
 
 The rendered html files can be viewed on the links below:
 
@@ -20,7 +22,7 @@ The rendered html files can be viewed on the links below:
 * Comparison: [3_influenza_comparison.html](http://htmlpreview.github.io/?https://github.com/aszabo08/rna-seq_analysis/blob/master/3_influenza_comparison.html)
 
 
-References
+**References**
 
 <a id="1">[1]</a >
 Schmidt N, Domingues P, Golebiowski F, Patzina C et al.
