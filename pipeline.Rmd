@@ -1,0 +1,402 @@
+---
+title: <center> <h1>Comparing Htseq and STAR quantmode results with Salmon</h1> </center>
+output: html_notebook
+---
+\ 
+\ 
+```{r load_packages, include=FALSE}
+library(BiocManager)
+library(grex)
+library(knitr)
+library(DESeq2)
+library(ggplot2)
+library(biomaRt)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(knitr)
+library(kableExtra)
+library(tidyverse)
+```
+
+
+```{r function, echo=FALSE}
+
+# This function runs differential expression analysis with DESeq, and gene set enrichment analysis with  clusterProfiler
+
+# Possible inputs:
+# options for count_table: "count_table_htseq", "count_table_quantmode"
+# options for sample_type: "wild", "mutant"
+
+
+rna_analysis <- function(count_table, sample_type) {
+  
+  
+  count_matrix = read_tsv(count_table, col_names = TRUE)
+  
+  # the gene ids contain the version numbers
+  # removing them with grex::cleanid
+   count_matrix$gene_id = cleanid(count_matrix$gene_id)
+   
+  # there are gene ids that are duplicated without the specific version number --> count_matrix[duplicated(count_matrix$gene_id), ]
+  
+  count_matrix = count_matrix %>% group_by(gene_id) %>% summarise_all(sum) %>% column_to_rownames(var = "gene_id") %>% as.matrix()
+  
+  
+  # import the sample table
+  sample_data = read_csv("sample_table.csv", col_names = TRUE) %>% as.data.frame()
+  
+  # selecting the correct subdata of the sample table and the appropiate contrast type depending on the input information
+  
+  if (sample_type == "wild") {
+    sample_data = sample_data[1:6, ]
+    sample_data$treatment <- factor(sample_data$treatment, levels= c("wt_mock", "wt_infected"))
+    count_matrix = count_matrix[ , 1:6]
+    contrast_type = c("treatment", "wt_infected","wt_mock")
+    
+    
+  } else if (sample_type == "mutant") {
+    sample_data = sample_data[7:12, ]
+    sample_data$treatment <- factor(sample_data$treatment, levels= c("6KR_mock", "6KR_infected"))
+    count_matrix = count_matrix[ , 7:12]
+    contrast_type = c("treatment", "6KR_infected","6KR_mock")
+    
+  } else {
+    stop("Incorrect sample_type: it can be either `wild` or `mutant`")
+  }
+
+  # the count results are saved in a tsv document for later comparison
+  count_df = as.data.frame(count_matrix) %>% rownames_to_column(var = 'ensg_id')
+  
+  write_tsv(count_df, paste0("../pipeline_output/", count_table, "_", sample_type))
+
+  
+  # differential expression analysis with DESeq
+  dds = DESeqDataSetFromMatrix(countData = count_matrix,
+                               colData = sample_data,
+                               design = ~ treatment) %>% DESeq()
+  
+  dds_f1 = results(dds, contrast = contrast_type)
+  
+  # removing the rows containing 'NA' values
+  dds_f1 = dds_f1 %>% as.data.frame() %>% rownames_to_column(var = 'ensg_id') 
+  dds_f1 = dds_f1[complete.cases(dds_f1), ]
+  
+  # setting the tresholds for differential expression
+  dds_f3 = dds_f1 %>% filter(padj < 0.01) %>% filter(abs(log2FoldChange) > 2)
+  
+  print(paste0("The number of differentially expressed genes in ", count_table, "_", sample_type, ": ", length(dds_f3$ensg_id)))
+  
+  # obtaining the annotation from Biomart
+  ensembl100 = useEnsembl(biomart = 'ensembl', dataset = 'hsapiens_gene_ensembl')
+
+  anno = getBM(attributes = c('ensembl_gene_id', 'entrezgene_id'),
+                  filters = 'ensembl_gene_id',
+                  values = dds_f1$ensg_id,
+                  mart = ensembl100)
+
+  anno_dds_f1 = left_join(dds_f1, anno, by = c('ensg_id' = 'ensembl_gene_id') )
+  
+  anno_dds_f3 = left_join(dds_f3, anno, by = c('ensg_id' = 'ensembl_gene_id') )
+  
+  entrez_gene = anno_dds_f3$entrezgene_id %>% as.character()
+
+  entrez_uni = anno_dds_f1$entrezgene_id %>% as.character()
+
+  # obtaining the enriched gene sets
+  ego = enrichGO(gene = entrez_gene,
+                  OrgDb = org.Hs.eg.db,
+                  ont = "BP",
+                  universe = entrez_uni,
+                  readable = TRUE)
+  
+
+  # obtaining the enriched Kegg pathways
+  kegg = enrichKEGG(gene = entrez_gene,
+                    universe = entrez_uni) %>% as.data.frame() %>% select(Description, GeneRatio, p.adjust)
+
+  rownames(kegg) = NULL
+  
+  return(list(kegg, ego))
+  
+  }
+
+```
+
+
+```{r calling_function, include=FALSE}
+htseq_wild = rna_analysis("count_table_htseq", "wild")
+htseq_mutant =rna_analysis("count_table_htseq", "mutant")
+quant_wild = rna_analysis("count_table_quantmode", "wild")
+quant_mutant = rna_analysis("count_table_quantmode", "mutant")
+
+```
+
+
+In this experiment I explore other ways than Salmon to quantify the mapped reads at gene level to find out whether the choice of quantifying method has an impact on the results.
+In all cases STAR was used to map the sequence reads to the reference genome, DESeq for differential expression analysis and clusterProfiler for gene set enrichment analysis.
+
+
+The following tables and plots show the list of over-representated KEGG pathways and the top biological processes that are enriched in the differentially expressed genes using Htseq and STAR quantmode for gene quantification across the samples.
+
+\ 
+\ 
+\ 
+
+**Over-representated KEGG pathways in the wild type samples**
+
+```{r kegg_wild, echo=FALSE}
+
+htseq_wild[1] %>% kable(caption = 'Htseq') %>% kable_styling(bootstrap_options = c("bordered", "hover"), full_width = FALSE, position = "float_left")
+quant_wild[1] %>% kable(caption = 'STAR --quantMode GeneCounts option') %>% kable_styling(bootstrap_options = c("bordered", "hover"), full_width = FALSE, position = "left")
+
+```
+
+
+```{r diff_kegg_wild, include=FALSE}
+# comparing the kegg pathways in the three results
+kegg_l_htseq = as.data.frame(htseq_wild[1])
+kegg_l_quant = as.data.frame(quant_wild[1])
+intersect(intersect(kegg_l_htseq$Description, kegg_l_quant$Description), kegg_wt_main$Description )
+
+intersect(kegg_l_quant$Description, kegg_wt_main$Description )
+
+setdiff(intersect(kegg_l_htseq$Description, kegg_l_quant$Description), intersect(intersect(kegg_l_htseq$Description, kegg_l_quant$Description), kegg_wt_main$Description ))
+
+length(kegg_wt_main$Description)
+length(kegg_l_htseq$Description)
+length(kegg_l_quant$Description)
+```
+
+
+The resulting lists of over-represented KEGG pathways only partially overlap with each other and with the original list using Salmon for read mapping and gene quantification. 
+In all of the three lists the following pathways are present:
+
+* Cytokine-cytokine receptor interaction
+* Viral protein interaction with cytokine and cytokine receptor
+* Staphylococcus aureus infection                              
+* IL-17 signaling pathway
+
+In addition, the following pathways are found to be over-respresented in the analyses using Htseq and STAR quantmode:
+
+* Neuroactive ligand-receptor interaction
+* JAK-STAT signaling pathway            
+* Rheumatoid arthritis  
+
+---
+
+\ 
+
+**Top 10 enriched biological processes in the wild type samples**
+
+```{r ego_wild, echo=FALSE, fig.show='hold', results='hide'}
+htseq_wild[2][[1]] %>% dotplot(title = "Htseq")
+quant_wild[2][[1]] %>% dotplot(title = "STAR --quantMode GeneCounts option")
+
+```
+
+In all three cases the most significantly enriched biological process was leukocyte differentiation.
+The ten top processes in the original analysis using Salmon are parts of various areas while in the case of Htseq and STAR quantmode the resulting processes mainly related to the regulation of the JAK-STAT (Janus kinase/signal transducers and activators of transcription )/STAT cascades. 
+
+---
+
+\ 
+
+**Over-representated KEGG pathways in the mutant samples**
+
+```{r kegg_mutant, echo=FALSE}
+
+htseq_mutant[1] %>% kable(caption = 'Htseq') %>% kable_styling(bootstrap_options = c("bordered", "hover"), full_width = FALSE, position = "float_left")
+quant_mutant[1] %>% kable(caption = 'STAR --quantMode GeneCounts option') %>% kable_styling(bootstrap_options = c("bordered", "hover"), full_width = FALSE, position = "left")
+
+```
+
+
+```{r diff_kegg_mutant, include=FALSE}
+
+kegg_2_htseq = as.data.frame(htseq_mutant[1])
+kegg_2_quant = as.data.frame(quant_mutant[1])
+intersect(intersect(kegg_2_htseq$Description, kegg_2_quant$Description), kegg_6KR_main$Description)
+
+setdiff(intersect(kegg_2_htseq$Description, kegg_2_quant$Description), intersect(intersect(kegg_2_htseq$Description, kegg_2_quant$Description), kegg_6KR_main$Description ))
+
+```
+
+In this case a larger portion of the over-represented KEGG-pathways overlap between the three analytical methods which are the following:
+
+
+* Cytokine-cytokine receptor interaction                       
+* Viral protein interaction with cytokine and cytokine receptor
+* IL-17 signaling pathway                                      
+* Hematopoietic cell lineage                                   
+* Inflammatory bowel disease (IBD)                             
+* Asthma                                                      
+* TNF signaling pathway                                        
+* Neuroactive ligand-receptor interaction                      
+* Staphylococcus aureus infection                              
+* Malaria                                               
+* NF-kappa B signaling pathway                                 
+* JAK-STAT signaling pathway
+
+All the remainig pathways in the list of Htseq are present in the over-represented list of STAR quantmode:
+
+* Osteoclast differentiation
+* Toll-like receptor signaling pathway
+* Influenza A
+* Rheumatoid arthritis"    
+
+---
+
+\ 
+
+**Top 10 enriched biological processes in TRIM 28 6KR mutant data**
+
+```{r ego_mutant, echo=FALSE, fig.show='hold', results='hide'}
+htseq_mutant[2][[1]] %>% dotplot(title = "Htseq")
+quant_mutant[2][[1]] %>% dotplot(title = "STAR --quantMode GeneCounts option")
+
+```
+
+```{r ego_vectors, include=FALSE}
+# creating vectors containing the visualized biological processes
+BP_salmon = c("leukocyte differentiation", "defense response to other organism", "response to virus", "defense response to virus", "myeloid leukocyte migration", "positive regulation of leukocyte migration", "type I interferon signaling pathway", "cellular response to type I interferon", "response to type I interferon", "negative regulation of viral life cycle" )
+
+BP_htseq = c("lymphocyte activation", "leukocyte differentiation", "sensory perception", "leukocyte migration", "lymphocyte differentiation", "adaptive immune response", "myeloid leukocyte migration", "type I interferon signaling pathway", "cellular response to type I interferon", "response to type I interferon" )
+
+BP_quantmode = c("leukocyte differentiation", "defense response to other organism", "lymphocyte differentiation", "myeloid leukocyte migration", "positive regulation of leukocyte migration", "type I interferon signaling pathway", "cellular response to type I interferon", "response to type I interferon","negative regulation of viral process", "negative regulation of viral life cycle")
+
+intersect(intersect(BP_htseq,BP_quantmode), BP_salmon)
+
+intersect(BP_salmon, BP_quantmode)
+
+```
+
+The enriched biological processes that are pesent in all three top lists are the following:
+
+* leukocyte differentiation              
+* myeloid leukocyte migration         
+* type I interferon signaling pathway   
+* cellular response to type I interferon
+* response to type I interferon
+
+In this case the results were closer between the lists produced by Salmon and STAR quantmode, where 8 processes out of the top 10 are the same.
+All three lists show greater response to viral infection than the samples with the wild type genes meeting our expectation as in the mutant cells the interferon transcription is not regulated negatively.
+
+---
+
+\ 
+
+These results are largely different from the previous ones obtained by Salmon.\ 
+
+In the following plots I compare the genes' counts in the first sample (run ID of the experiment: SRR9602253) resulted by the different methods to see whether there is a significant difference between them that could have resulted this deviation.
+
+```{r sample_counts, include=FALSE}
+
+salmon_wild1 = read_tsv("../pipeline_output/salmon_wild")
+htseq_wild1 = read_tsv("../pipeline_output/count_table_htseq_wild")
+quant_wild1 = read_tsv("../pipeline_output/count_table_quantmode_wild")
+
+
+salmon_1 = salmon_wild1[ , c('ensg_id' , 'SRR9602253')]
+
+htseq_1 = htseq_wild1[ , c('ensg_id' , 'SRR9602253')]
+
+quant_1 = quant_wild1[ , c('ensg_id' , 'SRR9602253')]
+
+
+joined_1 = inner_join(salmon_1, htseq_1,   by = c('ensg_id' ='ensg_id'))
+
+joined_1 = inner_join(joined_1, quant_1,   by = c('ensg_id' ='ensg_id'))
+
+colnames(joined_1) = c("ensg_id", "SRR9602253_salmon", "SRR9602253_htseq", "SRR9602253_quant")
+
+
+```
+
+```{r boxplot, echo=FALSE}
+
+boxplot(log2(joined_1$SRR9602253_salmon+ 1), log2(joined_1$SRR9602253_htseq+ 1), log2(joined_1$SRR9602253_quant+ 1),
+         names = c("Salmon", "Htseq", "STAR quantmode"), ylab="Log2 of the count data + 1", main = "Count of SRR9602253")
+
+```
+
+```{r comp_1, echo=FALSE}
+
+
+ggplot(joined_1, aes(x = log2(SRR9602253_salmon + 1), y = log2(SRR9602253_htseq + 1)))+
+      geom_point(alpha = 0.3) +
+      geom_abline(intercept = 0, slope = 1, colour = 'red', linetype = 2) +
+      labs(title = "Salmon count vs Htseq count in sample SRR9602253",
+            x = "log2 of Salmon count",
+            y = "log2 of Htseq count") +
+      theme(plot.title = element_text(hjust = 0.5 ,face="bold", size=14))
+
+
+```
+
+
+```{r test_1, echo=FALSE}
+cor.test(joined_1$SRR9602253_salmon,
+         joined_1$SRR9602253_htseq,
+         method = "spearman")
+```
+
+The Spearman's correlation coefficient is 0.8498323 with a low p-value indicating positive correlation between the two datasets, however the datasets are not identical. Based on the plot above Htseq resulted in higher count number in general.
+
+\ 
+
+```{r comp_2, echo=FALSE}
+
+ggplot(joined_1, aes(x = log2(SRR9602253_salmon + 1), y = log2(SRR9602253_quant + 1)))+
+      geom_point(alpha = 0.3) +
+      geom_abline(intercept = 0, slope = 1, colour = 'red', linetype = 2) +
+      labs(title = "Salmon count vs STAR quantmode count in sample SRR9602253",
+            x = "log2 of Salmon count",
+            y = "log2 of STAR quantmode count") +
+      theme(plot.title = element_text(hjust = 0.5 ,face="bold", size=14))
+```
+
+
+```{r test_2, echo=FALSE}
+cor.test(joined_1$SRR9602253_salmon,
+         joined_1$SRR9602253_quant,
+         method = "spearman")
+```
+
+The Spearman's correlation coefficient is 0.9135216 with low p-value showing a greater correlation between Salmon and STAR quantmode counts than between Salmon and Htseq. In this case Salmon counts were higher in general compared to the STAR quantmode result.
+
+\ 
+
+```{r comp_3, echo=FALSE, warning=FALSE}
+
+ggplot(joined_1, aes(x = log2(SRR9602253_htseq + 1), y = log2(SRR9602253_quant + 1)))+
+      geom_point(alpha = 0.3) +
+      geom_abline(intercept = 0, slope = 1, colour = 'red', linetype = 2) +
+      labs(title = "Htseq count vs STAR quantmode count in sample SRR9602253",
+            x = "log2 of Htseq count",
+            y = "log2 of STAR quantmode") +
+      theme(plot.title = element_text(hjust = 0.5 ,face="bold", size=14))
+```
+
+
+```{r test_3, echo=FALSE}
+cor.test(joined_1$SRR9602253_htseq,
+         joined_1$SRR9602253_quant,
+         method = "spearman")
+```
+
+The Spearman's correlation is 0.9009173 with low p-value showing great correlation between the count groups above.
+
+\ 
+
+In conclusion the resulting count numbers are not identical, but highly similar in the three groups, where the highest counts were produced by Htseq and the lowest by STAR quantmode.
+The counts from Salmon and STAR quantmode are the most similar to each other based on the findings above which is supported by their lists of top ten enriched biological processes in the mutant samples which show 80% similarity.
+In addition, the number of differentially expressed genes in the mutant samples quantified by Salmon was 2194, by Htseq 2838 and by STAR quantmode 2251, showing similar results between Salmon and STAR quantmode.
+
+The difference in the count numbers produced by the three different methods migth be explained by the different approaches of these software: Salmon uses "quasi-mapping" quantifying the reads at transcript level while STAR uses alignment-dependent mapping.
+With Htseq and STAR quantmode the genes were quantified at gene level and while in the event of a read mapping to multiple features the read was discarded with these software, it was counted proportionally with Salmon.
+
+
+Based on the STAR manual: "With --quantMode GeneCounts option STAR will count number reads per gene while mapping. A read is counted if it overlaps (1nt or more) one and only one gene. Both ends of the pairedend read are checked for overlaps. The counts coincide with those produced by htseq-count with default parameters." [Alexander Dobin: STAR manual.pdf](https://github.com/alexdobin/STAR/blob/master/doc/STARmanual.pdf)
+
+The difference in count numbers between STAR quantmode and Htseq in this case might origin in the different settings of the two quantification methods.\ 
+
