@@ -23,7 +23,7 @@ The rendered html files can be viewed on the links below:
 
 As alternative quantification methods I used Htseq and STAR quantmode for gene quantification in the samples to compare the results with Salmon. The resulting analysis can be viewed on the link below:
 
-* Htseq and STAR quantification: [pipeline.nb.html](http://htmlpreview.github.io/?https://github.com/aszabo08/rna-seq_analysis/blob/master/pipeline.nb.html)
+* Htseq and STAR quantification: [4_alter_quant.nb.html](http://htmlpreview.github.io/?https://github.com/aszabo08/rna-seq_analysis/blob/master/4_alter_quant.nb.html)
 
 
 **References**
