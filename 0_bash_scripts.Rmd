@@ -1,20 +1,16 @@
 ---
 title: "<center> <h1>Pre-processing the raw data</h1> </center>"
-output:
-  html_document:
-    df_print: paged
+output: html_notebook
 ---
 
 \ 
-\ 
-\ 
 
+\ 
 
 I downloaded the metadata of the experiment containing the SRR identifiers from the SRA Run Selector (<https://www.ncbi.nlm.nih.gov/Traces/study/?query_key=1&WebEnv=NCID_1_49133559_130.14.18.97_5555_1595467779_4208144827_0MetA0_S_HStore&o=acc_s%3Aa>)
-
+\ 
 
 The following Bash script downloads the raw data using the SRR indentifiers from the Sra Run table.
-
 ```{bash, eval=FALSE}
 #!/bin/bash
 
@@ -25,13 +21,12 @@ for i in ${SRR_ID}
                 echo 'Downloading the following SRA record:' ${i}
                 prefetch ${i}
                 fastq-dump --gzip --defline-qual '+' ${i}/${i}.sra
-                #rm the sra
         done
 ```
 
+\  
 
 After obtaining the sequencing data I ran FastQC and MultiQC to check the quality of the reads.
-
 ```{bash, eval=FALSE}
 #!/bin/bash
 
@@ -42,11 +37,18 @@ fastqc -o fastqc_output ../0_raw_data/*fastq.gz
 multiqc fastqc_output/
 ```
 
+\ 
 
-The MultiQC report shows adaptor contamination which is removed by the following script using trimmomatic.
+The MultiQC report shows high mean quality scores for all base calls, but there is also an indication of adapter contamination.
+
+![](C:/Ancsi/Bioinformatics Support Unit/project_virus_2020/pics/fastqc_per_base_sequence_quality_plot.png)
 
 
+![](C:/Ancsi/Bioinformatics Support Unit/project_virus_2020/pics/fastqc_adapter_content_plot.png)
 
+\ 
+
+The adaptor contamination was removed by the following script using trimmomatic.
 ```{bash, eval=FALSE}
 #!/bin/bash
 
@@ -74,22 +76,15 @@ for i in ${BASE_DIR}/*fastq.gz
         done
 ```
 
+\  
 
-I performed quality control again using a modified script of the previous one to check whether the adaptors were removed from the reads.
+I performed quality control again to check whether the adaptors were successfully removed from the reads.
 
-```{bash, eval=FALSE}
-#!/bin/bash
+![](C:/Ancsi/Bioinformatics Support Unit/project_virus_2020/pics/trimmed_fastqc_adapter_content_plot.png)
 
-mkdir trimmed_fastqc_output
-mkdir trimmed_multiqc_output
+\ 
 
-fastqc -o trimmed_fastqc_output trimmed_fastq/*.fastq.gz
-multiqc -o trimmed_multiqc_output trimmed_fastqc_output/
-```
-
-
-I mapped the trimmed reads to the reference human genome using the following script.
-
+I mapped the trimmed reads to the reference human genome with Salmon using the following script.
 ```{bash,eval=FALSE}
 #!/bin/bash
 
@@ -127,9 +122,9 @@ for i in ${FASTQ_FILES}/*.fastq.gz
 
 ```
 
+\ 
 
-
-I created a map between the Ensembl transcript ID and Ensembl gene ID which is going to be used by the "tximport" package in R with the following script:
+I created a map between the Ensembl transcript ID and Ensembl gene ID with the following script which is going to be used by the "tximport" package in R:
 
 ```{bash, eval=FALSE}
 #!/bin/bash
@@ -145,3 +140,276 @@ rm enst.txt ensg.txt
 
 
 After running these scripts I obtained the necessary information to start the analysis in R.
+
+---
+
+\ 
+
+## Additional scripts using STAR and Htseq
+
+\ 
+
+In order to compare the results by Salmon I also used STAR for mapping purposes and quantification alongside Htseq.
+
+\ 
+The STAR script I used to create an index for the human genome and map the reads is the following:
+```{bash, eval=FALSE}
+#!/bin/bash
+
+BASE_DIR=/home/anita/project_virus_2020
+FASTQ_FILES=${BASE_DIR}/1_QC/trimmed_fastq
+OUT_DIR=${BASE_DIR}/2_rna_count/1_STAR/STAR_alignments
+
+mkdir ${OUT_DIR}
+
+mkdir STAR_v34_index
+
+
+
+
+echo 'Start of downloading the primary assembly of the human reference genome'
+
+wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_34/GRCh38.primary_assembly.genome.fa.gz
+
+# STAR requires the genome fasta and annotation file to be unzipped
+
+gunzip GRCh38.primary_assembly.genome.fa.gz
+
+echo 'End of downloading the primary assembly'
+
+
+
+echo 'Start of downloading the gene annotation of the human reference genome'
+
+wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_34/gencode.v34.annotation.gtf.gz
+
+gunzip gencode.v34.annotation.gtf.gz
+
+echo 'End of downloading the gene annotation'
+
+
+
+
+echo 'Start of generating a STAR index'
+
+/home/anita/software/STAR-2.7.4a/bin/Linux_x86_64/STAR --runMode genomeGenerate \
+        --runThreadN 10 \
+        --genomeDir STAR_v34_index \
+        --genomeFastaFiles GRCh38.primary_assembly.genome.fa \
+        --sjdbGTFfile gencode.v34.annotation.gtf \
+        # based on the MultiQC report the sequence length is 126 bp and sjdbOverhang = ReadLength-1
+        --sjdbOverhang 125 \
+        --limitGenomeGenerateRAM=150000000000
+
+echo 'End of generating the STAR index'
+
+echo 'Start of mapping the reads to the STAR genome index'
+
+mkdir STAR_align
+
+for i in trimmed_fastq/*.fastq.gz
+        do
+                SAMPLE=$(basename ${i} .trimmed.fastq.gz)
+                echo 'Start of mapping ' ${SAMPLE}
+                /home/anita/software/STAR-2.7.4a/bin/Linux_x86_64/STAR --runMode alignReads \
+                        --outFileNamePrefix /home/anita/project_virus/virus_trimmed_2020/STAR_align/${SAMPLE}_ \
+                        --runThreadN 10 \
+                        --genomeDir /home/anita/project_virus/virus_trimmed_2020/STAR_v34_index \
+                        --readFilesIn ${i} \
+                        --readFilesCommand zcat \
+                        --outSAMtype BAM SortedByCoordinate \
+                        --twopassMode Basic \
+                        --twopass1readsN -1
+                echo 'End of mapping' ${SAMPLE}
+        done
+
+echo 'End of mapping the reads to the STAR genome index'
+
+```
+
+\ 
+
+The reads were quantified from the resulting BAM files at gene level with Htseq.
+
+```{bash, eval=FALSE}
+
+BAM_DIR=/home/anita/project_virus/virus_trimmed_2020/STAR_align
+
+mkdir htseq_count
+
+# Salmon previously detected SR library type, a stranded single-end protocol where the reads come from the reverse strand, so I added "reverse" for the "-s" stranded option
+
+for i in ${BAM_DIR}/*.bam
+
+
+        do
+                SAMPLE=$(basename ${i} _Aligned.sortedByCoord.out.bam)
+                
+                echo "Quantifying genes in" ${SAMPLE}
+
+                htseq-count     -f bam \
+                                -t gene \
+                                -s reverse \
+                                ${i} \
+                                gencode.v34.annotation.gtf > htseq_count/${SAMPLE}
+
+
+        done
+        
+```
+
+\ 
+
+The result is a two-column table for each sample containing the gene ID-s and the number of reads that were mapped to them. I created a table including the count number for all samples with the following script:
+
+```{bash, eval=FALSE}
+
+mkdir result_htseq
+
+
+# retrieving the gene ID-s (the last 5 lines contain general information about the reads, so they were not included)
+head -n -5 htseq_count/SRR9602253 | cut -f 1 > htseq_gene_id.txt
+
+# retrieving the gene counts of each samples
+for i in htseq_count/*
+
+        do
+                SAMPLE=$(basename ${i})
+                head -n -5 ${i} | cut -f 2 > result_htseq/${SAMPLE}
+
+        done
+
+
+# creating the count table and the header separately which will be merged after the loop
+
+# adding a header name for the first column which contains the gene ID-s
+echo "gene_id" > htseq_header_names.txt
+
+for i in result_htseq/*
+
+        do
+                SAMPLE=$(basename ${i})
+                # expanding the count table with the next gene count in the loop
+                paste htseq_gene_id.txt ${i} > temp_table.txt
+                mv temp_table.txt htseq_gene_id.txt
+
+                # expanding the header row with the name of the sample
+                echo ${SAMPLE} > sample_name.txt
+                paste htseq_header_names.txt sample_name.txt >  temp_header.txt
+                mv temp_header.txt htseq_header_names.txt
+                rm sample_name.txt
+        done
+
+# appending the header names with the counts
+cat htseq_gene_id.txt >> htseq_header_names.txt
+
+mv htseq_header_names.txt count_table_htseq
+
+# removing the created files used in the process
+rm -r result_htseq htseq_gene_id.txt
+
+```
+
+\ 
+
+The result is a count table that can be used in R for differential expression analysis.
+
+\ 
+
+In the third quantifying approach I used STAR for mapping the reads and quantifying them rigth away with the "--quantMode GeneCounts" option. As the STAR genome index was already created I reused it in the script below:
+
+```{bash, eval=FALSE}
+
+mkdir quantmode_result
+
+for i in trimmed_fastq/*.fastq.gz
+        do
+                SAMPLE=$(basename ${i} .trimmed.fastq.gz)
+                echo 'Start of mapping ' ${SAMPLE}
+                /home/anita/software/STAR-2.7.4a/bin/Linux_x86_64/STAR --runMode alignReads \
+                        --outFileNamePrefix /home/anita/project_virus/virus_trimmed_2020/quantmode_result/${SAMPLE}_ \
+                        --runThreadN 10 \
+                        --genomeDir /home/anita/project_virus/virus_trimmed_2020/STAR_v34_index \
+                        --readFilesIn ${i} \
+                        --readFilesCommand zcat \
+                        --outSAMtype BAM SortedByCoordinate \
+                        --twopassMode Basic \
+                        --twopass1readsN -1 \
+                        --quantMode GeneCounts
+                echo 'End of mapping' ${SAMPLE}
+        done
+
+```
+
+\ 
+
+Beside the previously resulted STAR files the "--quantMode GeneCounts" option creates a "ReadsPerGene.out.tab" for each sample. In this four-column table the first column contains the gene ID-s and the other three the gene counts with different strandedness options.
+With the following script I created a table with all the gene counts for all samples, similarly to the Htseq count table above.
+
+```{bash, eval=FALSE}
+
+#!/bin/bash
+
+
+mkdir count_result_quantmode
+
+
+# retrieving the gene ID-s (the first 4 lines contain general information about the reads, so they are not included)
+tail -n +5  quantmode_result/SRR9602253_ReadsPerGene.out.tab | cut -f 1 > gene_id.txt
+
+
+# retrieving the gene counts
+# the 4th column was used as based on the STAR manual it contains the "counts for the 2nd read strand aligned with RNA  (htseq-count option -s reverse)"
+
+for i in quantmode_result/*ReadsPerGene.out.tab
+
+        do
+                SAMPLE=$(basename ${i} _ReadsPerGene.out.tab)
+                tail -n +5 ${i} | cut -f 4 > count_result_quantmode/${SAMPLE}
+
+        done
+
+
+# creating the count table and the header separately which will be merged after the loop
+
+# adding a header name for the first column which contains the gene ID-s
+echo "gene_id" > header_names.txt
+
+for i in count_result_quantmode/*
+
+        do
+                SAMPLE=$(basename ${i})
+                # expanding the count table with the next gene count in the loop
+                paste gene_id.txt ${i} > temp_table.txt
+                mv temp_table.txt gene_id.txt
+
+                # expanding the header row with the name of the sample
+                echo ${SAMPLE} > sample_name.txt
+                paste header_names.txt sample_name.txt >  temp_header.txt
+                mv temp_header.txt header_names.txt
+                rm sample_name.txt
+        done
+
+# appending the header names with the counts
+cat gene_id.txt >> header_names.txt
+
+mv header_names.txt count_table_quantmode
+
+# removing the created files used in the process
+rm -r count_result_quantmode gene_id.txt
+
+```
+
+\ 
+
+The result is a count table which can also be used in R for differential expression analysis and comparison.
+
+\ 
+
+
+
+
+
+
+
+
