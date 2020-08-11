@@ -16,7 +16,7 @@ Tripartite motif–containing protein 28 (TRIM28) is a SUMO E3 ligase which is s
 
 The rendered html files can be viewed on the links below:
 
-* Bash scripts: [0_bash_scripts.html](http://htmlpreview.github.io/?https://github.com/aszabo08/rna-seq_analysis/blob/master/0_bash_scripts.html)
+* Bash scripts: [0_bash_scripts.html](http://htmlpreview.github.io/?https://github.com/aszabo08/rna-seq_analysis/blob/master/0_bash_scripts.nb.html)
 * RNA-seq analysis of wild type TRIM28: [1_influenza_TRIM28_wt.html](http://htmlpreview.github.io/?https://github.com/aszabo08/rna-seq_analysis/blob/master/1_influenza_TRIM28_wt.html)
 * RNA-seq analysis of mutant TRIM28: [2_influenza_TRIM28_6KR.html](http://htmlpreview.github.io/?https://github.com/aszabo08/rna-seq_analysis/blob/master/2_influenza_TRIM28_6KR.html)
 * Comparison: [3_influenza_comparison.html](http://htmlpreview.github.io/?https://github.com/aszabo08/rna-seq_analysis/blob/master/3_influenza_comparison.html)
