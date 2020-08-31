@@ -2,7 +2,7 @@ This is a personal project in bioinformatics performing an RNA-seq analysis usin
 
 **Background**: the experiment that generated the raw sequencing data I am using was conducted by Schmidt N, Domingues P, Golebiowski F, Patzina C et al. from University of Zurich [[1]](#1)
 I accessed this publicly available data on Sequence Read Archive (SRA), under the SRA identifier "SRP212102" (<https://www.ncbi.nlm.nih.gov/sra?term=SRP212102>)
-The aim of the experiment was to compare the differentially expressed genes in human lung epithelial cells expressing wild type TRIM28 or SUMOylation-deficient mutant TRIM28 (TRIM28 6KR) after influenza A infection.
+The aim of the experiment was to compare the differentially expressed genes in human lung epithelial cells expressing wild type TRIM28 and SUMOylation-deficient mutant TRIM28 (TRIM28 6KR) after influenza A infection.
 
 Small Ubiquitin-like Modifier (SUMO) proteins participate in SUMOylation which is a post-translational modification process. They bound to target proteins and can alter their activity, stability and localization in the cell. In this experiment their involvement with transcriptional regulation is studied, in relation with Interferon regulatory factor 7 (IRF7).
 IRF7 regulates the transcription of interferons, which are signalling proteins that result in virus induced defensive response from the immune system.
